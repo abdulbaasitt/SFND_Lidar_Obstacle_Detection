@@ -35,6 +35,12 @@ std::vector<Car> initHighway(bool renderScene, pcl::visualization::PCLVisualizer
 }
 
 
+/**
+ * @brief Function to display a simple highway with obstacles and segmented clusters using PCL library.
+ * 
+ * @param viewer A shared pointer to a PCLVisualizer object.
+ */
+
 void simpleHighway(pcl::visualization::PCLVisualizer::Ptr& viewer)
 {
     // ----------------------------------------------------
@@ -42,15 +48,89 @@ void simpleHighway(pcl::visualization::PCLVisualizer::Ptr& viewer)
     // ----------------------------------------------------
     
     // RENDER OPTIONS
-    bool renderScene = true;
+    bool renderScene = false;
     std::vector<Car> cars = initHighway(renderScene, viewer);
     
     // TODO:: Create lidar sensor 
-
+    Lidar lidar(cars, 0);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr lidarPoints = lidar.scan();
+    // renderPointCloud(viewer, lidarPoints, "lidar points", Color(1, 1, 1));
     // TODO:: Create point processor
+    ProcessPointClouds<pcl::PointXYZ> pointProcessor; 
+    std::pair<pcl::PointCloud<pcl::PointXYZ>::Ptr, pcl::PointCloud<pcl::PointXYZ>::Ptr> segmentCloud = pointProcessor.SegmentPlane(lidarPoints, 100, 0.2);
+    // renderPointCloud(viewer, segmentCloud.first, "obstCloud", Color(1, 0, 0));
+    renderPointCloud(viewer, segmentCloud.second, "planeCloud", Color(0, 0, 1));
+
+    // render different clusters for obstCloud
+    std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> cloudClusters = pointProcessor.Clustering(segmentCloud.first, 1.2, 4, 40);
+
+    int clusterId = 0;
+    std::vector<Color> colors = {Color(1,0,0), Color(0,1,0), Color(0,0,1)};
+
+    for(pcl::PointCloud<pcl::PointXYZ>::Ptr cluster : cloudClusters)
+    {
+        std::cout << "cluster size ";
+        pointProcessor.numPoints(cluster);
+        renderPointCloud(viewer,cluster,"obstCloud"+std::to_string(clusterId),Color(1, 1, 1));
+        Box box = pointProcessor.BoundingBox(cluster);
+        renderBox(viewer,box,clusterId, Color(0, 1, 0));
+        ++clusterId;
+        BoxQ boxQ = pointProcessor.BoundingBoxQ(cluster);
+        renderBox(viewer,boxQ,clusterId, Color(1, 0, 0));        
+        ++clusterId;
+    }
   
 }
 
+/**
+ * This function takes in a PCLVisualizer object, a ProcessPointClouds object, and a PointCloud object as input.
+ * It filters the input cloud, segments the ground plane, clusters the obstacles, and renders the segmented and clustered point clouds.
+ * @param viewer A shared pointer to a PCLVisualizer object.
+ * @param pointProcessorI A pointer to a ProcessPointClouds<pcl::PointXYZI> object.
+ * @param inputCloud A shared pointer to a PointCloud<pcl::PointXYZI> object.
+ */
+
+void cityBlock(pcl::visualization::PCLVisualizer::Ptr &viewer, ProcessPointClouds<pcl::PointXYZI> *pointProcessorI, const pcl::PointCloud<pcl::PointXYZI>::Ptr &inputCloud)
+{
+    // ----------------------------------------------------
+    // -----Open 3D viewer and display City Block     -----
+    // ----------------------------------------------------
+
+    // ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
+    // pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloud = pointProcessorI->loadPcd("../src/sensors/data/pcd/data_1/0000000000.pcd");
+    pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloudFiltered = pointProcessorI->FilterCloud(inputCloud, 0.2, Eigen::Vector4f(-20, -6.5, -2, 1), Eigen::Vector4f(50, 6.5, 2, 1));
+    // renderPointCloud(viewer,inputCloudFiltered,"inputCloudFiltered");
+
+    // step1: segmentation
+    std::pair<pcl::PointCloud<pcl::PointXYZI>::Ptr, pcl::PointCloud<pcl::PointXYZI>::Ptr> segmentCloud = pointProcessorI->SegmentPlane(inputCloudFiltered, 100, 0.15);
+
+    // step2: cluster
+    renderPointCloud(viewer, segmentCloud.second, "roadCloud", Color(0, 1, 0));
+    // renderPointCloud(viewer, segmentCloud.first, "obstCloud");
+
+    // render different clusters for obstCloud
+    std::vector<pcl::PointCloud<pcl::PointXYZI>::Ptr> cloudClusters = pointProcessorI->Clustering(segmentCloud.first, 0.5, 10, 600);
+    int clusterId = 0;
+    std::vector<Color> colors = {Color(1, 0, 0), Color(0, 1, 0), Color(0, 0, 1)};
+
+    for (pcl::PointCloud<pcl::PointXYZI>::Ptr cluster : cloudClusters)
+    {
+        std::cout << "cluster size ";
+        pointProcessorI->numPoints(cluster);
+        renderPointCloud(viewer, cluster, "obstCloud" + std::to_string(clusterId), colors[clusterId % colors.size()]);
+        Box box = pointProcessorI->BoundingBox(cluster);
+        renderBox(viewer, box, clusterId, Color(1, 0, 0));
+        ++clusterId;
+    }
+}
+
+
+/**
+ * @brief Initializes the camera position and angle for the PCLVisualizer object.
+ * 
+ * @param setAngle The desired camera angle (XY, TopDown, Side, FPS).
+ * @param viewer A shared pointer to the PCLVisualizer object.
+ */
 
 //setAngle: SWITCH CAMERA ANGLE {XY, TopDown, Side, FPS}
 void initCamera(CameraAngle setAngle, pcl::visualization::PCLVisualizer::Ptr& viewer)
@@ -83,10 +163,28 @@ int main (int argc, char** argv)
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
     CameraAngle setAngle = XY;
     initCamera(setAngle, viewer);
-    simpleHighway(viewer);
+    // simpleHighway(viewer);
+    // cityBlock(viewer);
+
+    ProcessPointClouds<pcl::PointXYZI>* pointProcessorI = new ProcessPointClouds<pcl::PointXYZI>();
+    std::vector<boost::filesystem::path> stream = pointProcessorI->streamPcd("../src/sensors/data/pcd/data_1");
+    auto streamIterator = stream.begin();
+    pcl::PointCloud<pcl::PointXYZI>::Ptr inputCloudI;
 
     while (!viewer->wasStopped ())
     {
+        // Clear viewer
+        viewer->removeAllPointClouds();
+        viewer->removeAllShapes();
+
+        // Load pcd and run obstacle detection process
+        inputCloudI = pointProcessorI->loadPcd((*streamIterator).string());
+        cityBlock(viewer, pointProcessorI, inputCloudI);
+
+        streamIterator++;
+        if(streamIterator == stream.end())
+            streamIterator = stream.begin();
+
         viewer->spinOnce ();
     } 
 }
