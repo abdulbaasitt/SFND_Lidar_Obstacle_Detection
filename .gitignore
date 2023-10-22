@@ -1,0 +1,24 @@
+
+# Executables
+build/
+devel/
+logs/
+install/
+CMakeFiles/
+
+# Compiled files
+*.pyc
+
+
+.catkin_workspace
+.catkin_tools
+
+
+.vscode/
+
+
+.idea
+
+
+
+
