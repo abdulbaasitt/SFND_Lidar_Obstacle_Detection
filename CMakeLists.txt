@@ -15,7 +15,6 @@ add_definitions(${PCL_DEFINITIONS})
 list(REMOVE_ITEM PCL_LIBRARIES "vtkproj4")
 
 
-# add_executable (environment src/environment.cpp src/render/render.cpp src/processPointClouds.cpp ransac3d.cpp ransac3d.h src/kdtree3d.h src/cluster3d.h src/cluster3d.cpp)
 add_executable (environment src/environment.cpp src/render/render.cpp src/processPointClouds.cpp)
 target_link_libraries (environment ${PCL_LIBRARIES})
 
