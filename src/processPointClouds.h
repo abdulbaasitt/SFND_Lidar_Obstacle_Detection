@@ -12,44 +12,56 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/transforms.h>
-#include <pcl/common/pca.h>
-#include <iostream> 
-#include <string>  
+#include <unordered_set>
+#include <iostream>
+#include <string>
 #include <vector>
 #include <ctime>
 #include <chrono>
 #include "render/box.h"
 
-template<typename PointT>
-class ProcessPointClouds {
-public:
+#include "ransac3d.cpp"
+#include "cluster3d.cpp"
 
-    //constructor
-    ProcessPointClouds();
-    //deconstructor
-    ~ProcessPointClouds();
+namespace lidar_obstacle_detection {
 
-    void numPoints(typename pcl::PointCloud<PointT>::Ptr cloud);
+    // shorthand for point cloud pointer
+    template<typename PointT>
+    using PtCdtr = typename pcl::PointCloud<PointT>::Ptr;
 
-    typename pcl::PointCloud<PointT>::Ptr FilterCloud(typename pcl::PointCloud<PointT>::Ptr cloud, float filterRes, Eigen::Vector4f minPoint, Eigen::Vector4f maxPoint);
+    template<typename PointT>
 
-    std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SeparateClouds(pcl::PointIndices::Ptr inliers, typename pcl::PointCloud<PointT>::Ptr cloud);
+    class ProcessPointClouds {
+    public:
 
-    std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> SegmentPlane(typename pcl::PointCloud<PointT>::Ptr cloud, int maxIterations, float distanceThreshold);
-    
-    std::pair<typename pcl::PointCloud<PointT>::Ptr, typename pcl::PointCloud<PointT>::Ptr> Segment(typename pcl::PointCloud<PointT>::Ptr cloud, int maxIterations, float distanceThreshold);
+        //constructor
+        ProcessPointClouds();
 
-    std::vector<typename pcl::PointCloud<PointT>::Ptr> Clustering(typename pcl::PointCloud<PointT>::Ptr cloud, float clusterTolerance, int minSize, int maxSize);
+        //deconstructor
+        ~ProcessPointClouds();
 
-    Box BoundingBox(typename pcl::PointCloud<PointT>::Ptr cluster);
+        void numPoints(PtCdtr<PointT> cloud);
 
-    BoxQ BoundingBoxQ(typename pcl::PointCloud<PointT>::Ptr cluster);
+        PtCdtr<PointT>FilterCloud(PtCdtr<PointT> cloud, float filterRes, Eigen::Vector4f minPoint,Eigen::Vector4f maxPoint);
 
-    void savePcd(typename pcl::PointCloud<PointT>::Ptr cloud, std::string file);
+        std::pair<PtCdtr<PointT>, PtCdtr<PointT>>SeparateClouds(pcl::PointIndices::Ptr inliers, PtCdtr<PointT> cloud);
 
-    typename pcl::PointCloud<PointT>::Ptr loadPcd(std::string file);
+        std::pair<PtCdtr<PointT>, PtCdtr<PointT>>RansacSegmentPlane(PtCdtr<PointT> cloud, int maxIterations, float distanceTol);
 
-    std::vector<boost::filesystem::path> streamPcd(std::string dataPath);
-  
-};
+        std::pair<PtCdtr<PointT>, PtCdtr<PointT>>SegmentPlane(PtCdtr<PointT> cloud, int maxIterations, float distanceTol);
+
+        std::vector<PtCdtr<PointT>>EuclideanClustering(PtCdtr<PointT> cloud, float clusterTolerance, int minSize,int maxSize);
+
+        std::vector<PtCdtr<PointT>>Clustering(PtCdtr<PointT> cloud, float clusterTolerance, int minSize, int maxSize);
+
+        Box BoundingBox(PtCdtr<PointT> cluster);
+
+        void savePcd(PtCdtr<PointT> cloud, std::string file);
+
+        PtCdtr<PointT> loadPcd(std::string file);
+
+        std::vector<boost::filesystem::path> streamPcd(std::string dataPath);
+
+    };
+}
 #endif /* PROCESSPOINTCLOUDS_H_ */

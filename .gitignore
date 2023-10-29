@@ -5,6 +5,8 @@ devel/
 logs/
 install/
 CMakeFiles/
+OLD/
+media_Unt/
 
 # Compiled files
 *.pyc
